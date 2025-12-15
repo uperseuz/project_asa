@@ -1,24 +1,22 @@
 ---
-# Importa as configurações comuns
-- import_playbook: common.yml
-
-# Playbook específico do servidor de arquivos
 - name: Configuração do servidor de arquivos (arq)
   hosts: arq
   become: yes
 
   vars:
-    dominio: "caua.joao.devops"
-    ip_arq: "192.168.56.121"
-    ip_db: "192.168.56.105"
-    ip_app: "192.168.56.125"
-
-    gateway: "192.168.56.1"
-    dhcp_range_start: "192.168.56.50"
-    dhcp_range_end: "192.168.56.100"
+    dominio: caua.joao.devops
+    ip_arq: 192.168.56.121
+    ip_db: 192.168.56.105
+    ip_app: 192.168.56.125
+    gateway: 192.168.56.1
+    rede: 192.168.56.0/24
+    gateway: 192.168.56.1
+    usuarios:
+      - caua
+      - joao
 
   tasks:
-    # ---------------- DHCP ----------------
+    # ================= DHCP =================
     - name: Instalar servidor DHCP
       apt:
         name: isc-dhcp-server
@@ -26,23 +24,31 @@
 
     - name: Configurar DHCP
       template:
-        src: dhcp.conf.j2
+        src: dhcpd.conf.j2
         dest: /etc/dhcp/dhcpd.conf
       notify: restart dhcp
 
     - name: Configurar interface do DHCP
-      copy:
-        content: 'INTERFACESv4="enp0s8"'
-        dest: /etc/default/isc-dhcp-server
+      lineinfile:
+        path: /etc/default/isc-dhcp-server
+        regexp: '^INTERFACESv4='
+        line: 'INTERFACESv4="{{ interface_dhcp }}"'
+        state: present
       notify: restart dhcp
 
-    # ---------------- DNS ----------------
+    # ================= DNS =================
     - name: Instalar Bind9
       apt:
         name: bind9
         state: present
 
-    - name: Configurar named.conf.local
+    - name: Configurar opções do Bind (forwarders)
+      template:
+        src: named.conf.options.j2
+        dest: /etc/bind/named.conf.options
+      notify: restart bind9
+
+    - name: Configurar zonas no named.conf.local
       template:
         src: named.conf.local.j2
         dest: /etc/bind/named.conf.local
@@ -50,50 +56,94 @@
 
     - name: Criar zona direta
       template:
-        src: db.caua.joao.devops.j2
-        dest: /etc/bind/db.caua.joao.devops
+        src: db.dominio.j2
+        dest: /etc/bind/db.{{ dominio }}
       notify: restart bind9
 
-    # ---------------- LVM ----------------
-    - name: Criar PVs
-      command: pvcreate /dev/sdb /dev/sdc /dev/sdd
-      ignore_errors: yes
+    - name: Criar zona reversa (OBRIGATÓRIO no projeto)
+      template:
+        src: db.reversa.j2
+        dest: /etc/bind/db.56.168.192
+      notify: restart bind9
 
-    - name: Criar VG dados
-      command: vgcreate dados /dev/sdb /dev/sdc /dev/sdd
-      ignore_errors: yes
+    # Habilita e inicia o serviço BIND9.
+    - name: Habilitar e iniciar servidor DNS.
+      systemd:
+        name: bind9
+        state: started
+        enabled: yes
 
-    - name: Criar LV ifpb
-      command: lvcreate -L 15G -n ifpb dados
-      ignore_errors: yes
+    # ================= LVM =================
+    # Versão idempotente usando módulos Ansible
+    - name: Criar partições nos discos
+      parted:
+        device: "/dev/sd{{ item }}"
+        number: 1
+        state: present
+        part_type: primary
+        fs_type: ext4
+        flags: [ lvm ]
+      loop: [ 'b', 'c', 'd' ]
 
-    - name: Formatar LV
+    - name: Criar Physical Volumes (PVs)
+      lvg:
+        pvs: "/dev/sd{{ item }}1"
+        vg: dados
+        pv_state: present
+      loop: [ 'b', 'c', 'd' ]
+
+    - name: Criar Volume Group (VG) dados
+      lvg:
+        vg: dados
+        pvs: "/dev/sdb1,/dev/sdc1,/dev/sdd1"
+        vg_state: present
+
+    - name: Criar Logical Volume (LV) ifpb com 15GB
+      lvol:
+        vg: dados
+        lv: ifpb
+        size: 15G
+        force: yes
+
+    - name: Formatar LV com ext4
       filesystem:
         fstype: ext4
-        dev: /dev/dados/ifpb
+        dev: "/dev/dados/ifpb"
 
     - name: Criar diretório /dados
       file:
         path: /dados
         state: directory
+        owner: root
+        group: root
+        mode: '0755'
 
-    - name: Montar /dados automaticamente
+    - name: Montar /dados automaticamente no boot
       mount:
         path: /dados
-        src: /dev/dados/ifpb
+        src: "/dev/dados/ifpb"
         fstype: ext4
         state: mounted
+        opts: defaults
 
-    # ---------------- NFS ----------------
+    - name: Adicionar ao fstab
+      lineinfile:
+        path: /etc/fstab
+        line: '/dev/dados/ifpb /dados ext4 defaults 0 0'
+        state: present
+
+    # ================= NFS =================
     - name: Instalar NFS Server
       apt:
         name: nfs-kernel-server
         state: present
 
-    - name: Criar usuário nfs-ifpb
+    - name: Criar usuário nfs-ifpb SEM SHELL
       user:
         name: nfs-ifpb
-        shell: /usr/sbin/nologin
+        shell: /usr/sbin/nologin  # Remove shell para segurança
+        system: yes
+        state: present
 
     - name: Criar diretório NFS
       file:
@@ -101,29 +151,41 @@
         state: directory
         owner: nfs-ifpb
         group: nfs-ifpb
-        mode: '0770'
+        mode: '0775'
 
-    - name: Configurar exports NFS
-      template:
-        src: nfs-exports.j2
+    - name: Configurar exports NFS com todas opções de segurança
+      copy:
         dest: /etc/exports
+        content: |
+          # Compartilhamento NFS com configurações de segurança
+          /dados/nfs 192.168.56.0/24(rw,sync,no_subtree_check,all_squash,anonuid=$(id -u nfs-ifpb),anongid=$(id -g nfs-ifpb))
+        owner: root
+        group: root
+        mode: '0644'
       notify: restart nfs
+
+    - name: Garantir que serviços iniciam no boot
+      systemd:
+        name: "{{ item }}"
+        enabled: yes
+        state: started
+      loop:
+        - isc-dhcp-server
+        - bind9
+        - nfs-kernel-server
 
   handlers:
     - name: restart dhcp
-      service:
+      systemd:
         name: isc-dhcp-server
         state: restarted
-        enabled: yes
 
     - name: restart bind9
-      service:
+      systemd:
         name: bind9
         state: restarted
-        enabled: yes
 
     - name: restart nfs
-      service:
+      systemd:
         name: nfs-kernel-server
         state: restarted
-        enabled: yes
