@@ -1,46 +1,43 @@
 ---
-# Playbook simplificado para servidor DB
-- name: Configurar servidor de banco de dados
+- name: Configuração básica do servidor DB
   hosts: db
   become: yes
 
   tasks:
-    # Instalar MariaDB
+    # 1. MariaDB
     - name: Instalar MariaDB
       apt:
         name: mariadb-server
         state: present
 
-    - name: Iniciar e habilitar MariaDB
+    - name: Iniciar MariaDB
       systemd:
         name: mariadb
         state: started
         enabled: yes
 
-    # Configurar autofs para NFS
+    # 2. Autofs para NFS (versão segura)
     - name: Instalar autofs
       apt:
         name: autofs
         state: present
 
-    - name: Configurar montagem automática do NFS
+    - name: Configurar autofs para NFS do arq
       copy:
-        dest: /etc/auto.master
+        dest: /etc/auto.nfs
         content: |
-          /var/nfs /etc/auto.nfs
+          dados -fstype=nfs4,rw 192.168.56.121:/dados/nfs
         owner: root
         group: root
         mode: '0644'
       notify: restart autofs
 
-    - name: Configurar entrada NFS
-      copy:
-        dest: /etc/auto.nfs
-        content: |
-          dados -fstype=nfs,rw 192.168.56.121:/dados/nfs
-        owner: root
-        group: root
-        mode: '0644'
+    - name: Adicionar ao auto.master
+      shell: |
+        # Adiciona linha se não existir
+        grep -q "^/var/nfs" /etc/auto.master || echo "/var/nfs /etc/auto.nfs" >> /etc/auto.master
+      args:
+        executable: /bin/bash
       notify: restart autofs
 
     - name: Criar diretório de montagem
@@ -49,6 +46,11 @@
         state: directory
         owner: root
         group: root
+
+    - name: Reiniciar autofs para aplicar configurações
+      systemd:
+        name: autofs
+        state: restarted
 
   handlers:
     - name: restart autofs
