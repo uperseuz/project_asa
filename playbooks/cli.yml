@@ -1,49 +1,68 @@
 ---
-- import_playbook: common.yml
-
-- name: Configuração do host cliente
+# Playbook simplificado para cliente
+- name: Configuração básica do host cliente
   hosts: cli
   become: yes
 
-  vars:
-    nfs_server: "arq.caua.joao.devops"
-    nfs_share: "/dados/nfs"
-
   tasks:
-    # Pacotes exigidos
-    - name: Instalar Firefox e X11
+    # 1. Pacotes obrigatórios
+    - name: Instalar firefox-esr e xauth
       apt:
         name:
           - firefox-esr
           - xauth
         state: present
 
-    # Autofs
-    - name: Instalar autofs
-      apt:
-        name: autofs
+    # 2. Configurar SSH para X11
+    - name: Habilitar X11 Forwarding
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^X11Forwarding'
+        line: 'X11Forwarding yes'
         state: present
+      notify: restart ssh
 
-    - name: Configurar auto.master
-      template:
-        src: auto.master.j2
-        dest: /etc/auto.master
-      notify: restart autofs
-
-    - name: Configurar mapa NFS
+    # 3. Configurar autofs para NFS
+    - name: Configurar autofs para NFS
       copy:
-        content: "* -fstype=nfs4 {{ nfs_server }}:{{ nfs_share }}"
-        dest: /etc/auto.nfs
+        dest: /etc/auto.nfs-cli
+        content: |
+          dados -fstype=nfs,rw 192.168.56.121:/dados/nfs
+        owner: root
+        group: root
+        mode: '0644'
       notify: restart autofs
 
-    - name: Criar ponto de montagem
+    - name: Adicionar ao auto.master
+      lineinfile:
+        path: /etc/auto.master
+        line: '/var/nfs /etc/auto.nfs-cli'
+        state: present
+      notify: restart autofs
+
+    - name: Criar diretório de montagem
       file:
         path: /var/nfs
         state: directory
+        owner: root
+        group: root
+
+    # 4. Garantir serviços ativos
+    - name: Reiniciar serviços
+      systemd:
+        name: "{{ item }}"
+        state: restarted
+      loop:
+        - ssh
+        - autofs
 
   handlers:
+    - name: restart ssh
+      systemd:
+        name: ssh
+        state: restarted
+
     - name: restart autofs
-      service:
+      systemd:
         name: autofs
         state: restarted
-        enabled: yes
