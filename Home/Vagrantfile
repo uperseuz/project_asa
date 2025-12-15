@@ -56,12 +56,7 @@ Vagrant.configure("2") do |config|
 
     db.vm.network "private_network",
       type: "dhcp",
-      mac: "080027AAAAAA"
-
-    db.vm.provider "virtualbox" do |vb|
-      vb.name = "db-devops"
-      vb.memory = 512
-    end
+      mac: "0800271A0021"
 
     db.vm.provision "ansible" do |ansible|
       ansible.playbook = "playbooks/db.yml"
@@ -76,12 +71,7 @@ Vagrant.configure("2") do |config|
 
     app.vm.network "private_network",
       type: "dhcp",
-      mac: "080027BBBBBB"
-
-    app.vm.provider "virtualbox" do |vb|
-      vb.name = "app-devops"
-      vb.memory = 512
-    end
+      mac: "0800272B2100"
 
     app.vm.provision "ansible" do |ansible|
       ansible.playbook = "playbooks/app.yml"
@@ -95,7 +85,7 @@ Vagrant.configure("2") do |config|
     cli.vm.hostname = "cli.caua.joao.devops"
     cli.vm.network "private_network", type: "dhcp"
 
-    cli.vm.provider "virtualbox" do |vb|
+    cli.vm.provider "virtualbox" do |v|
       vb.name = "cli-devops"
       vb.memory = 1024
     end
