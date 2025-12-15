@@ -27,20 +27,16 @@ Vagrant.configure("2") do |config|
 
 
   # Trigger para desabilitar DHCP do VirtualBox (Host-Only)
-  config.trigger.after :up do |trigger|
-    trigger.name = "Desabilitar DHCP do VirtualBox"
-    trigger.run = {
-      inline: <<-SHELL
-        VBoxManage dhcpserver remove --netname HostInterfaceNetworking-vboxnet0 || true
-      SHELL
-    }
+  config.trigger.before :"Vagrant::Action::Builtin::WaitForCommunicator", type: :action do |t|
+    t.warn = "Iterrompe o servidor dhcp do virtualbox"
+    t.run = {inline: "vboxmanage dhcpserver stop --interface vboxnet0"}
   end
-
   config.vm.provision "ansible" do |ansible|
     ansible.compatibility_mode = "2.0"
     ansible.playbook = "playbooks/common.yml"
     ansible.groups = {
-      "all" => ["arq", "db", "app", "cli"] 
+      "all" => ["arq", "db", "app", "cli"]
+  }
   end
 
   # ================= SERVIDOR DE ARQUIVOS =================
@@ -96,7 +92,7 @@ Vagrant.configure("2") do |config|
     cli.vm.hostname = "cli.caua.joao.devops"
     cli.vm.network "private_network", type: "dhcp"
 
-    cli.vm.provider "virtualbox" do |v|
+    cli.vm.provider "virtualbox" do |vb|
       vb.name = "cli-devops"
       vb.memory = 1024
     end
