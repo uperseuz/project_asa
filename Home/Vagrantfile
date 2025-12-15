@@ -39,12 +39,6 @@ Vagrant.configure("2") do |config|
       vb.name = "arq-devops"
       vb.memory = 512
 
-      # Criar controller SATA se não existir
-      vb.customize ["storagectl", :id,
-                    "--name", "SATA Controller",
-                    "--add", "sata",
-                    "--controller", "IntelAHCI"]
-
       # Criar e anexar 3 discos de 10GB
       (1..3).each do |i|
         disk = File.expand_path("disk-arq-#{i}.vdi", __dir__)
