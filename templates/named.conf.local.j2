@@ -1,0 +1,11 @@
+# Zona direta do domínio do projeto
+zone "{{ dominio }}" {
+    type master;
+    file "/etc/bind/db.{{ dominio }}";
+};
+
+# Zona reversa da rede 192.168.56.0/24
+zone "56.168.192.in-addr.arpa" {
+    type master;
+    file "/etc/bind/db.56.168.192";
+};
