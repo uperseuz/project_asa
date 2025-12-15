@@ -1,0 +1,59 @@
+---
+- import_playbook: common.yml
+
+- name: Configuração do servidor de aplicação
+  hosts: app
+  become: yes
+
+  vars:
+    nfs_server: "arq.caua.joao.devops"
+    nfs_share: "/dados/nfs"
+
+  tasks:
+    # Apache Web Server
+    - name: Instalar Apache2
+      apt:
+        name: apache2
+        state: present
+
+    - name: Ativar Apache
+      service:
+        name: apache2
+        state: started
+        enabled: yes
+
+    # Página web do projeto
+    - name: Copiar página index.html
+      template:
+        src: index.html.j2
+        dest: /var/www/html/index.html
+
+    # Autofs para NFS
+    - name: Instalar autofs
+      apt:
+        name: autofs
+        state: present
+
+    - name: Configurar auto.master
+      template:
+        src: auto.master.j2
+        dest: /etc/auto.master
+      notify: restart autofs
+
+    - name: Configurar mapa NFS
+      copy:
+        content: "* -fstype=nfs4 {{ nfs_server }}:{{ nfs_share }}"
+        dest: /etc/auto.nfs
+      notify: restart autofs
+
+    - name: Criar ponto de montagem
+      file:
+        path: /var/nfs
+        state: directory
+
+  handlers:
+    - name: restart autofs
+      service:
+        name: autofs
+        state: restarted
+        enabled: yes
