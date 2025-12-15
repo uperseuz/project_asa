@@ -13,6 +13,7 @@
       apt:
         update_cache: yes
         upgrade: yes
+        upgrade_dist: yes
 
 #Faz a instalação do pacote chrony
     - name: Instalar chrony
@@ -32,7 +33,7 @@
     - name: Reiniciar chrony
       systemd:
         name: chrony
-        state: started
+        state: restarted
         enabled: yes
 
 #Adiciona o fuso da maquina para o de Recife
@@ -88,7 +89,7 @@
         line: 'AllowGroups vagrant ifpb'  # Apenas usuários destes grupos podem acessar
         state: present
 
-    # Banner de Aviso Legal (requisito do projeto)
+    # Banner de Aviso Legal
     - name: Configurar banner de SSH
       copy:
         dest: /etc/issue.net
