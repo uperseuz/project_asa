@@ -6,7 +6,6 @@ Vagrant.configure("2") do |config|
   # ================= CONFIGURAÇÃO GLOBAL =================
 
   if Vagrant.has_plugin?("vagrant-vbguest")
-    # Desativa atualização automática do guest additions.
     config.vbguest.auto_update = false
   end
 
