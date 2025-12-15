@@ -23,6 +23,12 @@ IP estático: 192.168.56.121 (XX = 21 da matrícula do Caua)
 
 Três discos adicionais de 10 GB cada
 
+
+
+____________________________________________
+
+
+
 Servidor de Banco de Dados (db):
 
 Hostname: db.caua.joao.devops
@@ -31,6 +37,10 @@ IP via DHCP com MAC: 0800271A0021
 
 512 MB de RAM
 
+____________________________________________
+
+
+
 Servidor de Aplicação (app):
 
 Hostname: app.caua.joao.devops
@@ -38,6 +48,10 @@ Hostname: app.caua.joao.devops
 IP via DHCP com MAC: 0800272B2100
 
 512 MB de RAM
+
+
+____________________________________________
+
 
 Cliente (cli):
 
@@ -48,6 +62,12 @@ IP via DHCP
 1024 MB de RAM
 
 Todas as máquinas usam a box debian/bookworm64, com linked_clone habilitado, guest additions desabilitado e sem geração de novas chaves SSH. Um trigger é configurado para desabilitar o servidor DHCP do VirtualBox na rede host-only.
+
+
+
+____________________________________________
+
+
 
 Playbooks
 
@@ -79,6 +99,12 @@ Geração de chaves SSH para os usuários
 Instalação do cliente NFS
 
 Permissão de sudo sem senha para o grupo ifpb
+
+
+
+____________________________________________
+
+
 
 arq.yml
 Configura o servidor de arquivos (arq) com todos os serviços:
@@ -125,6 +151,11 @@ Mapeia todos os usuários remotos para nfs-ifpb
 
 Configura sync para gravações imediatas no disco
 
+
+____________________________________________
+
+
+
 db.yml
 Configura a VM db:
 
@@ -137,6 +168,11 @@ Instalação do autofs para montagem automática NFS
 Configuração para montar /dados/nfs do servidor arq em /var/nfs
 
 Inicialização e habilitação do serviço autofs
+
+
+____________________________________________
+
+
 
 app.yml
 Configura a VM app:
@@ -157,6 +193,11 @@ Configuração para montar /dados/nfs do servidor arq em /var/nfs
 
 Inicialização e habilitação dos serviços Apache e autofs
 
+
+____________________________________________
+
+
+
 cli.yml
 Configura a VM cli:
 
@@ -167,6 +208,11 @@ Configuração do SSH para permitir encaminhamento X11
 Instalação do autofs para montagem automática NFS
 
 Configuração para montar /dados/nfs do servidor arq em /var/nfs
+
+
+____________________________________________
+
+
 
 Arquivos de Configuração
 Para o servidor arq, são utilizados templates Jinja2:
@@ -180,6 +226,11 @@ named.conf.local.j2 - Configuração de zonas DNS
 db.dominio.j2 - Zona direta para caua.joao.devops
 
 db.reversa.j2 - Zona reversa para rede 192.168.56.0/24
+
+
+____________________________________________
+
+
 
 Para o servidor app:
 
