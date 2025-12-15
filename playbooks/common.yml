@@ -1,130 +1,152 @@
 ---
-# Playbook comum aplicado a TODAS as máquinas
-# Responsável por padronizar o sistema operacional
-- name: Configuração comum para todas as máquinas
+- name: Configuração básica para todas as máquinas
   hosts: all
   become: yes
 
   vars:
-    # Fuso horário exigido pelo projeto
-    timezone: "America/Recife"
-
-    # Servidor NTP solicitado
-    ntp_server: "pool.ntp.br"
-
-
+    ntp_servers:
+      - pool.ntp.br  
+  
   tasks:
-    # Atualiza o cache do apt
-    - name: Atualizar cache de pacotes
+
+    - name: Atualizar apt cache e fazer upgrade do sistema
       apt:
         update_cache: yes
-        cache_valid_time: 3600
+        upgrade: yes
 
-    # Atualiza todo o sistema operacional
-    - name: Atualizar sistema (upgrade)
+#Faz a instalação do pacote chrony
+    - name: Instalar chrony
       apt:
-        upgrade: dist
-        autoremove: yes
-
-    # Pacotes básicos e cliente NFS
-    - name: Instalar pacotes essenciais
-      apt:
-        name:
-          - chrony          # NTP
-          - curl
-          - wget
-          - htop
-          - tree
-          - vim
-          - git
-          - nfs-common      # Cliente NFS 
+        name: chrony
         state: present
 
-    # Ajuste de fuso horário
+    # Configura o servidor NTP específico
+    - name: Configurar servidor NTP para pool.ntp.br
+      lineinfile:
+        path: /etc/chrony/chrony.conf  # Arquivo de configuração do chrony
+        regexp: '^pool '   # Procura linhas que começam com 'pool '
+        line: 'pool pool.ntp.br iburst'  # Substitui pela configuração desejada
+        state: present     # Garante que a linha existe
+
+    # Aplica as mudanças reiniciando o serviço
+    - name: Reiniciar chrony
+      systemd:
+        name: chrony
+        state: started
+        enabled: yes
+
+#Adiciona o fuso da maquina para o de Recife
     - name: Configurar timezone
       timezone:
-        name: "{{ timezone }}"
+        name: America/Recife
 
-    # Configuração do chrony via template
-    - name: Configurar NTP (chrony)
-      template:
-        src: chrony.conf.j2
-        dest: /etc/chrony/chrony.conf
-      notify: restart chrony
-
-    # Grupo exigido pelo projeto
+    # Cria o grupo 'ifpb' para organização dos usuários
     - name: Criar grupo ifpb
       group:
-        name: ifpb
+        name: ifpb         # Nome do grupo
+        state: present     # Garante que o grupo existe
+
+
+
+    - name: Criar usuários do grupo
+      user:
+      name: "{{ item }}" # Variável que será substituída pelos itens do loop
+        groups: ifpb       # Adiciona o usuário ao grupo ifpb
+        append: yes        # Adiciona ao grupo sem remover outros grupos
+        shell: /bin/bash   # Shell padrão do usuário
+      loop:
+        - caua
+        - joao
+
+    # Instala o servidor SSH se não estiver presente
+    - name: Instalar openssh-server
+      apt:
+        name: openssh-server
         state: present
 
-    # Criação dos usuários do grupo
-    - name: Criar usuários caua e joao
-      user:
-        name: "{{ item }}"
-        groups: ifpb
-        append: yes
-        shell: /bin/bash
-        create_home: yes
+    #Segurança: Desativa autenticação por senha
+    - name: Configurar SSH para permitir apenas autenticação por chave
+      lineinfile:
+        path: /etc/ssh/sshd_config  # Arquivo de configuração do SSH
+        regexp: '^PasswordAuthentication'  # Procura configuração de autenticação por senha
+        line: 'PasswordAuthentication no'  # Desativa autenticação por senha
+        state: present
+
+    #Segurança: Bloqueia acesso root remoto
+    - name: Bloquear acesso root via SSH
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^PermitRootLogin'  # Configuração de acesso root
+        line: 'PermitRootLogin no'  # Bloqueia acesso root via SSH
+        state: present
+
+    # Segurança: Restringe grupos permitidos
+    - name: Permitir apenas usuários dos grupos vagrant e ifpb
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^AllowGroups'  # Configuração de grupos permitidos
+        line: 'AllowGroups vagrant ifpb'  # Apenas usuários destes grupos podem acessar
+        state: present
+
+    # Banner de Aviso Legal (requisito do projeto)
+    - name: Configurar banner de SSH
+      copy:
+        dest: /etc/issue.net
+        content: |         # Conteúdo do banner (preserva formatação)
+          Acesso apenas para pessoas com autorização expressa!!!
+        owner: root
+        group: root
+        mode: '0644'
+
+    # Ativa o banner no SSH
+    - name: Ativar banner no SSH
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^Banner'
+        line: 'Banner /etc/issue.net'
+        state: present
+
+    # Geração de chaves SSH para os usuários
+    - name: Gerar chaves SSH para usuários (se não existirem)
+      shell: |             
+        # Verifica se a chave já existe
+        if [ ! -f /home/{{ item }}/.ssh/id_rsa ]; then
+          ssh-keygen -t rsa -N "" -f /home/{{ item }}/.ssh/id_rsa
+        fi
       loop:
         - caua
         - joao
+      become_user: "{{ item }}"  # Executa como o usuário especificado
 
-    # Permitir sudo sem senha ao grupo ifpb
-    - name: Configurar sudo para grupo ifpb
-      copy:
-        content: "%ifpb ALL=(ALL:ALL) NOPASSWD: ALL"
-        dest: /etc/sudoers.d/ifpb
-        mode: '0440'
+    #Aplica todas as configurações SSH
+    - name: Reiniciar SSH
+      systemd:
+        name: ssh
+        state: restarted   # Reinicia para aplicar mudanças
 
-    # Criação do diretório .ssh
-    - name: Criar diretório .ssh para usuários
-      file:
-        path: "/home/{{ item }}/.ssh"
-        state: directory
-        owner: "{{ item }}"
-        group: "{{ item }}"
-        mode: '0700'
-      loop:
-        - caua
-        - joao
+    # Instala o cliente NFS para montar compartilhamentos remotos
+    - name: Instalar cliente NFS
+      apt:
+        name: nfs-common   # Pacote do cliente NFS no Debian
+        state: present
 
-    # Distribuição das chaves públicas
-    - name: Copiar chaves SSH
-      copy:
-        src: "files/authorized_keys_{{ item }}"
-        dest: "/home/{{ item }}/.ssh/authorized_keys"
-        owner: "{{ item }}"
-        group: "{{ item }}"
-        mode: '0600'
-      loop:
-        - caua
-        - joao
+    # Concede privilégios administrativos ao grupo ifpb
+    - name: Permitir grupo ifpb usar sudo sem senha
+      lineinfile:
+        path: /etc/sudoers  # Arquivo de configuração do sudo
+        regexp: '^%ifpb'    # Procura configuração existente para o grupo ifpb
+        line: '%ifpb ALL=(ALL) NOPASSWD:ALL'  # Permite tudo sem senha
+        state: present
+        validate: 'visudo -cf %s'  # Valida a sintaxe antes de salvar
 
-    # Configuração do servidor SSH conforme enunciado
-    - name: Configurar servidor SSH
-      template:
-        src: sshd_config.j2
-        dest: /etc/ssh/sshd_config
-      notify: restart ssh
-
-    # Configuração da mensagem de boas-vindas
-    - name: Configurar MOTD
-      copy:
-        content: "{{ motd_message }}"
-        dest: /etc/motd
-
+  # Handlers para reiniciar serviços quando necessário:
   handlers:
-    # Reinicia chrony se houver alteração
     - name: restart chrony
-      service:
+      systemd:
         name: chrony
         state: restarted
-        enabled: yes
 
-    # Reinicia SSH após alterações
     - name: restart ssh
-      service:
+      systemd:
         name: ssh
         state: restarted
-        enabled: yes
