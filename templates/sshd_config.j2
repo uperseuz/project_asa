@@ -1,0 +1,18 @@
+# Porta padrão do SSH
+Port 22
+
+# Bloqueia acesso direto ao root
+PermitRootLogin no
+
+# Permite apenas autenticação por chave pública
+PubkeyAuthentication yes
+PasswordAuthentication no
+
+# Apenas usuários dos grupos vagrant e ifpb
+AllowGroups vagrant ifpb
+
+# Permite aplicações gráficas via SSH (X11)
+X11Forwarding yes
+
+# Banner exibido ao acessar o sistema
+Banner /etc/motd
