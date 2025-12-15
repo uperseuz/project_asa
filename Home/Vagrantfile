@@ -1,0 +1,131 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+
+  # ================= CONFIGURAÇÃO GLOBAL =================
+  config.vm.box = "debian/bookworm64"
+  config.vm.box_check_update = false
+
+  # Não gerar novas chaves SSH
+  config.ssh.insert_key = false
+
+  # Desabilitar guest additions
+  if Vagrant.has_plugin?("vagrant-vbguest")
+    config.vbguest.auto_update = false
+  end
+
+  # Provider VirtualBox
+  config.vm.provider "virtualbox" do |vb|
+    vb.linked_clone = true
+  end
+
+  # Trigger para desabilitar DHCP do VirtualBox (Host-Only)
+  config.trigger.after :up do |trigger|
+    trigger.name = "Desabilitar DHCP do VirtualBox"
+    trigger.run = {
+      inline: <<-SHELL
+        VBoxManage dhcpserver remove --netname HostInterfaceNetworking-vboxnet0 || true
+      SHELL
+    }
+  end
+
+  # ================= SERVIDOR DE ARQUIVOS =================
+  config.vm.define "arq" do |arq|
+    arq.vm.hostname = "arq.caua.joao.devops"
+    arq.vm.network "private_network", ip: "192.168.56.121"
+
+    arq.vm.provider "virtualbox" do |vb|
+      vb.name = "arq-devops"
+      vb.memory = 512
+
+      # Criar controller SATA se não existir
+      vb.customize ["storagectl", :id,
+                    "--name", "SATA Controller",
+                    "--add", "sata",
+                    "--controller", "IntelAHCI"]
+
+      # Criar e anexar 3 discos de 10GB
+      (1..3).each do |i|
+        disk = File.expand_path("disk-arq-#{i}.vdi", __dir__)
+
+        unless File.exist?(disk)
+          vb.customize ["createhd",
+                        "--filename", disk,
+                        "--size", 10240]
+        end
+
+        vb.customize ["storageattach", :id,
+                      "--storagectl", "SATA Controller",
+                      "--port", i,
+                      "--device", 0,
+                      "--type", "hdd",
+                      "--medium", disk]
+      end
+    end
+
+    arq.vm.provision "ansible" do |ansible|
+      ansible.playbook = "playbooks/arq.yml"
+      ansible.become = true
+      ansible.verbose = "v"
+    end
+  end
+
+  # ================= SERVIDOR DB =================
+  config.vm.define "db" do |db|
+    db.vm.hostname = "db.caua.joao.devops"
+
+    db.vm.network "private_network",
+      type: "dhcp",
+      mac: "080027AAAAAA"
+
+    db.vm.provider "virtualbox" do |vb|
+      vb.name = "db-devops"
+      vb.memory = 512
+    end
+
+    db.vm.provision "ansible" do |ansible|
+      ansible.playbook = "playbooks/db.yml"
+      ansible.become = true
+      ansible.verbose = "v"
+    end
+  end
+
+  # ================= SERVIDOR APP =================
+  config.vm.define "app" do |app|
+    app.vm.hostname = "app.caua.joao.devops"
+
+    app.vm.network "private_network",
+      type: "dhcp",
+      mac: "080027BBBBBB"
+
+    app.vm.provider "virtualbox" do |vb|
+      vb.name = "app-devops"
+      vb.memory = 512
+    end
+
+    app.vm.provision "ansible" do |ansible|
+      ansible.playbook = "playbooks/app.yml"
+      ansible.become = true
+      ansible.verbose = "v"
+    end
+  end
+
+  # ================= CLIENTE =================
+  config.vm.define "cli" do |cli|
+    cli.vm.hostname = "cli.caua.joao.devops"
+    cli.vm.network "private_network", type: "dhcp"
+
+    cli.vm.provider "virtualbox" do |vb|
+      vb.name = "cli-devops"
+      vb.memory = 1024
+    end
+
+    cli.vm.provision "ansible" do |ansible|
+      ansible.playbook = "playbooks/cli.yml"
+      ansible.become = true
+      ansible.verbose = "v"
+    end
+  end
+
+end
