@@ -1,18 +1,21 @@
 # Porta padrão do SSH
 Port 22
 
-# Bloqueia acesso direto ao root
+# Bloqueia login direto do root
 PermitRootLogin no
 
-# Permite apenas autenticação por chave pública
+# Permitir apenas autenticação por chave pública
 PubkeyAuthentication yes
 PasswordAuthentication no
 
-# Apenas usuários dos grupos vagrant e ifpb
+# Permitir acesso apenas aos grupos exigidos
 AllowGroups vagrant ifpb
 
-# Permite aplicações gráficas via SSH (X11)
+# Permitir exportação gráfica via SSH (X11)
 X11Forwarding yes
 
-# Banner exibido ao acessar o sistema
+# Mensagem exibida no login
 Banner /etc/motd
+
+# Utiliza PAM (necessário no Debian)
+UsePAM yes
