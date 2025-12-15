@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+          <html lang="pt-br">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Projeto DevOps - IFPB</title>
+              <style>
+                  body {
+                      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                      margin: 0;
+                      padding: 0;
+                      background: linear-gradient(135deg, #1a2980, #26d0ce);
+                      color: #333;
+                      min-height: 100vh;
+                  }
+                  
+                  .container {
+                      max-width: 1200px;
+                      margin: 40px auto;
+                      background: white;
+                      border-radius: 15px;
+                      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+                      overflow: hidden;
+                  }
+                  
+                  .header {
+                      background: linear-gradient(90deg, #2c3e50, #3498db);
+                      color: white;
+                      padding: 30px;
+                      text-align: center;
+                  }
+                  
+                  .header h1 {
+                      margin: 0;
+                      font-size: 2.5em;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      gap: 15px;
+                  }
+                  
+                  .content {
+                      padding: 40px;
+                  }
+                  
+                  .info-card {
+                      background: #f8f9fa;
+                      border-left: 5px solid #3498db;
+                      padding: 20px;
+                      margin-bottom: 25px;
+                      border-radius: 8px;
+                  }
+                  
+                  .equipe-grid {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                      gap: 25px;
+                      margin: 30px 0;
+                  }
+                  
+                  .membro-card {
+                      background: white;
+                      border: 2px solid #e0e0e0;
+                      border-radius: 10px;
+                      padding: 25px;
+                      text-align: center;
+                      transition: transform 0.3s, box-shadow 0.3s;
+                  }
+                  
+                  .membro-card:hover {
+                      transform: translateY(-5px);
+                      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+                  }
+                  
+                  .membro-card h3 {
+                      color: #2c3e50;
+                      margin-bottom: 10px;
+                  }
+                  
+                  .servicos-grid {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                      gap: 15px;
+                      margin-top: 20px;
+                  }
+                  
+                  .servico-item {
+                      background: #e8f4fc;
+                      padding: 15px;
+                      border-radius: 8px;
+                      text-align: center;
+                  }
+                  
+                  .ip-display {
+                      font-family: 'Courier New', monospace;
+                      background: #2c3e50;
+                      color: #00ff9d;
+                      padding: 15px;
+                      border-radius: 8px;
+                      margin: 20px 0;
+                      font-size: 1.1em;
+                  }
+                  
+                  .footer {
+                      text-align: center;
+                      padding: 20px;
+                      background: #f1f2f6;
+                      color: #666;
+                      border-top: 1px solid #ddd;
+                  }
+                  
+                  @media (max-width: 768px) {
+                      .container {
+                          margin: 20px;
+                      }
+                      
+                      .content {
+                          padding: 20px;
+                      }
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <h1>
+                          🚀 
+                          <span>Projeto DevOps com Vagrant e Ansible</span>
+                      </h1>
+                  </div>
+                  
+                  <div class="content">
+                      <div class="info-card">
+                          <h2>📋 Informações do Projeto</h2>
+                          <p><strong>Disciplina:</strong> Administração de Sistemas Abertos</p>
+                          <p><strong>Professor:</strong> Leonidas Lima</p>
+                          <p><strong>Período:</strong> 2025.2</p>
+                          <p><strong>Instituição:</strong> IFPB - Campus João Pessoa</p>
+                      </div>
+                      
+                      <div class="info-card">
+                          <h2>Infraestrutura Configurada</h2>
+                          <div class="ip-display">
+                              Servidor de Arquivos (arq): {{ ip_arq }}<br>
+                              Servidor de Banco de Dados (db): {{ ip_db }}<br>
+                              Servidor de Aplicação (app): {{ ip_app }}<br>
+                              Domínio: {{ dominio }}
+                          </div>
+                      </div>
+                      
+                      <h2>Equipe</h2>
+                      <div class="equipe-grid">
+                          <div class="membro-card">
+                              <h3>{{ caua | capitalize }}</h3>
+                              <p><strong>Matrícula:</strong> {{ 20241380021 }}</p>
+                              <p><strong>Função:</strong> Desenvolvimento e Automação</p>
+                              <p><strong>Hostname:</strong> app.{{ dominio }}</p>
+                          </div>
+                          
+                          <div class="membro-card">
+                              <h3>{{ joao | capitalize }}</h3>
+                              <p><strong>Matrícula:</strong> {{ 20241380005 }}</p>
+                              <p><strong>Função:</strong> Configuração e Infraestrutura</p>
+                              <p><strong>IP do Servidor:</strong> {{ ip_app }}</p>
+                          </div>
+                      </div>
+                      
+                      <div class="info-card">
+                          <h2>🛠️ Serviços Configurados</h2>
+                          <div class="servicos-grid">
+                              <div class="servico-item">🌐 Apache2 Web Server</div>
+                              <div class="servico-item">📁 Autofs + NFS Client</div>
+                              <div class="servico-item">🔐 SSH Seguro</div>
+                              <div class="servico-item">⏰ NTP (Chrony)</div>
+                              <div class="servico-item">🔄 Sudo para grupo ifpb</div>
+                              <div class="servico-item">👤 Usuários Personalizados</div>
+                          </div>
+                      </div>
+                      
+                      <div class="info-card">
+                          <h2>🎯 Objetivos Alcançados</h2>
+                          <ul>
+                              <li>Infraestrutura como Código com Vagrant</li>
+                              <li>Automação completa com Ansible Playbooks</li>
+                              <li>Serviços de rede (DHCP, DNS, NFS) configurados</li>
+                              <li>Segurança implementada (SSH, Sudo, Firewall)</li>
+                              <li>Monitoramento e sincronização de tempo</li>
+                          </ul>
+                      </div>
+                  </div>
+                  
+                  <div class="footer">
+                      <p>Projeto desenvolvido para a disciplina de Administração de Sistemas Abertos</p>
+                      <p>© 2025 - IFPB Campus João Pessoa</p>
+                  </div>
+              </div>
+          </body>
+          </html>
