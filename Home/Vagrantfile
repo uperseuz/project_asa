@@ -37,14 +37,10 @@ Vagrant.configure("2") do |config|
     arq.vm.hostname = "arq.caua.joao.devops"
     arq.vm.network "private_network", ip: "192.168.56.121"
 
-    arq.vm.provider "virtualbox" do |vb|
-      vb.name = "arq-devops"
-      vb.memory = 512
-
-      # Criar e anexar 3 discos de 10GB
-          (0..2).each do |x|
-      arq.vm.disk :disk, size: "10GB", name: "disk-#{x}"
-    end
+    # Criar e anexar 3 discos de 10GB
+    (0..2).each do |x|
+    arq.vm.disk :disk, size: "10GB", name: "disk-#{x}"
+  end
 
 
     arq.vm.provision "ansible" do |ansible|
