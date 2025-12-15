@@ -1,0 +1,130 @@
+---
+# Playbook comum aplicado a TODAS as máquinas
+# Responsável por padronizar o sistema operacional
+- name: Configuração comum para todas as máquinas
+  hosts: all
+  become: yes
+
+  vars:
+    # Fuso horário exigido pelo projeto
+    timezone: "America/Recife"
+
+    # Servidor NTP solicitado
+    ntp_server: "pool.ntp.br"
+
+
+  tasks:
+    # Atualiza o cache do apt
+    - name: Atualizar cache de pacotes
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    # Atualiza todo o sistema operacional
+    - name: Atualizar sistema (upgrade)
+      apt:
+        upgrade: dist
+        autoremove: yes
+
+    # Pacotes básicos e cliente NFS
+    - name: Instalar pacotes essenciais
+      apt:
+        name:
+          - chrony          # NTP
+          - curl
+          - wget
+          - htop
+          - tree
+          - vim
+          - git
+          - nfs-common      # Cliente NFS 
+        state: present
+
+    # Ajuste de fuso horário
+    - name: Configurar timezone
+      timezone:
+        name: "{{ timezone }}"
+
+    # Configuração do chrony via template
+    - name: Configurar NTP (chrony)
+      template:
+        src: chrony.conf.j2
+        dest: /etc/chrony/chrony.conf
+      notify: restart chrony
+
+    # Grupo exigido pelo projeto
+    - name: Criar grupo ifpb
+      group:
+        name: ifpb
+        state: present
+
+    # Criação dos usuários do grupo
+    - name: Criar usuários caua e joao
+      user:
+        name: "{{ item }}"
+        groups: ifpb
+        append: yes
+        shell: /bin/bash
+        create_home: yes
+      loop:
+        - caua
+        - joao
+
+    # Permitir sudo sem senha ao grupo ifpb
+    - name: Configurar sudo para grupo ifpb
+      copy:
+        content: "%ifpb ALL=(ALL:ALL) NOPASSWD: ALL"
+        dest: /etc/sudoers.d/ifpb
+        mode: '0440'
+
+    # Criação do diretório .ssh
+    - name: Criar diretório .ssh para usuários
+      file:
+        path: "/home/{{ item }}/.ssh"
+        state: directory
+        owner: "{{ item }}"
+        group: "{{ item }}"
+        mode: '0700'
+      loop:
+        - caua
+        - joao
+
+    # Distribuição das chaves públicas
+    - name: Copiar chaves SSH
+      copy:
+        src: "files/authorized_keys_{{ item }}"
+        dest: "/home/{{ item }}/.ssh/authorized_keys"
+        owner: "{{ item }}"
+        group: "{{ item }}"
+        mode: '0600'
+      loop:
+        - caua
+        - joao
+
+    # Configuração do servidor SSH conforme enunciado
+    - name: Configurar servidor SSH
+      template:
+        src: sshd_config.j2
+        dest: /etc/ssh/sshd_config
+      notify: restart ssh
+
+    # Configuração da mensagem de boas-vindas
+    - name: Configurar MOTD
+      copy:
+        content: "{{ motd_message }}"
+        dest: /etc/motd
+
+  handlers:
+    # Reinicia chrony se houver alteração
+    - name: restart chrony
+      service:
+        name: chrony
+        state: restarted
+        enabled: yes
+
+    # Reinicia SSH após alterações
+    - name: restart ssh
+      service:
+        name: ssh
+        state: restarted
+        enabled: yes
