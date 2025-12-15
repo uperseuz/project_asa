@@ -12,8 +12,8 @@
     - name: Atualizar apt cache e fazer upgrade do sistema
       apt:
         update_cache: yes
-        upgrade: yes
-        upgrade_dist: yes
+        #upgrade: yes
+        #upgrade_dist: yes
 
 #Faz a instalação do pacote chrony
     - name: Instalar chrony
@@ -107,17 +107,30 @@
         line: 'Banner /etc/issue.net'
         state: present
 
-    # Geração de chaves SSH para os usuários
-    - name: Gerar chaves SSH para usuários (se não existirem)
-      shell: |             
-        # Verifica se a chave já existe
-        if [ ! -f /home/{{ item }}/.ssh/id_rsa ]; then
-          ssh-keygen -t rsa -N "" -f /home/{{ item }}/.ssh/id_rsa
-        fi
+    - name: Criar diretório .ssh com permissões
+      file:
+        path: /home/{{ item }}/.ssh
+        state: directory
+        owner: "{{ item }}"
+        group: "{{ item }}"
+        mode: '0700'
       loop:
         - caua
         - joao
-      become_user: "{{ item }}"  # Executa como o usuário especificado
+      become: yes
+
+    - name: Gerar chave SSH usando módulo openssh_keypair
+      openssh_keypair:
+        path: /home/{{ item }}/.ssh/id_rsa
+        type: rsa
+        owner: "{{ item }}"
+        group: "{{ item }}"
+        mode: '0600'
+        state: present
+      loop:
+        - caua
+        - joao
+      become: yes
 
     #Aplica todas as configurações SSH
     - name: Reiniciar SSH
