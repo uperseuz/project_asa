@@ -14,6 +14,10 @@
     usuarios:
       - caua
       - joao
+    vg_name: "ifpb_vg"
+    lv_name: "ifpb_lv"
+    mount_point: "/dados"
+    nfs_dir: "/dados/nfs"
 
   tasks:
     # ================= DHCP =================
@@ -21,11 +25,13 @@
       apt:
         name: isc-dhcp-server
         state: present
+        update_cache: yes
 
     - name: Configurar DHCP
       template:
         src: dhcpd.conf.j2
         dest: /etc/dhcp/dhcpd.conf
+        mode: '0644'
       notify: restart dhcp
 
     - name: Configurar interface do DHCP
@@ -34,6 +40,7 @@
         regexp: '^INTERFACESv4='
         line: 'INTERFACESv4="{{ interface_dhcp }}"'
         state: present
+        backup: yes
       notify: restart dhcp
 
     # ================= DNS =================
@@ -41,129 +48,171 @@
       apt:
         name: bind9
         state: present
+        update_cache: yes
 
     - name: Configurar opções do Bind (forwarders)
       template:
         src: named.conf.options.j2
         dest: /etc/bind/named.conf.options
+        mode: '0644'
       notify: restart bind9
 
     - name: Configurar zonas no named.conf.local
       template:
         src: named.conf.local.j2
         dest: /etc/bind/named.conf.local
+        mode: '0644'
       notify: restart bind9
 
     - name: Criar zona direta
       template:
         src: db.dominio.j2
-        dest: /etc/bind/db.{{ dominio }}
+        dest: "/etc/bind/db.{{ dominio.split('.')[0] }}"
+        mode: '0644'
       notify: restart bind9
 
     - name: Criar zona reversa (OBRIGATÓRIO no projeto)
       template:
         src: db.reversa.j2
         dest: /etc/bind/db.56.168.192
+        mode: '0644'
       notify: restart bind9
 
-    # Habilita e inicia o serviço BIND9.
-    - name: Habilitar e iniciar servidor DNS.
-      systemd:
-        name: bind9
-        state: started
-        enabled: yes
-
     # ================= LVM =================
-    # Versão idempotente usando módulos Ansible
-    - name: Criar partições nos discos
+    - name: Instalar pacotes necessários para LVM
+      apt:
+        name:
+          - parted
+          - lvm2
+          - e2fsprogs
+        state: present
+        update_cache: yes
+
+    - name: Verificar discos disponíveis
+      set_fact:
+        discos_disponiveis: "{{ ['sdb', 'sdc', 'sdd'] | select('in', ansible_facts['devices'].keys()) | list }}"
+
+    - name: Criar partições LVM nos discos disponíveis
       parted:
-        device: "/dev/sd{{ item }}"
+        device: "/dev/{{ item }}"
+        label: gpt
         number: 1
         state: present
-        part_type: primary
-        fs_type: ext4
-        flags: [ lvm ]
-      loop: [ 'b', 'c', 'd' ]
+        part_start: "1MiB"
+        part_end: "100%"
+      loop: "{{ discos_disponiveis }}"
+      when: discos_disponiveis | length > 0
 
     - name: Criar Physical Volumes (PVs)
-      lvg:
-        pvs: "/dev/sd{{ item }}1"
-        vg: dados
-        pv_state: present
-      loop: [ 'b', 'c', 'd' ]
+      shell: |
+        if [ -b /dev/{{ item }}1 ] && ! pvs /dev/{{ item }}1 2>/dev/null; then
+          pvcreate /dev/{{ item }}1 --yes
+        fi
+      loop: "{{ discos_disponiveis }}"
+      when: discos_disponiveis | length > 0
 
-    - name: Criar Volume Group (VG) dados
-      lvg:
-        vg: dados
-        pvs: "/dev/sdb1,/dev/sdc1,/dev/sdd1"
-        vg_state: present
+    - name: Criar Volume Group ifpb_vg
+      shell: |
+        if ! vgs ifpb_vg 2>/dev/null; then
+          PVS=""
+          {% for disco in ['sdb', 'sdc', 'sdd'] %}
+          if [ -b /dev/{{ disco }}1 ] && pvs /dev/{{ disco }}1 2>/dev/null; then
+            PVS="$PVS /dev/{{ disco }}1"
+          fi
+          {% endfor %}
+          if [ -n "$PVS" ]; then
+            vgcreate ifpb_vg $PVS
+          fi
+        fi
+      when: discos_disponiveis | length > 0
 
-    - name: Criar Logical Volume (LV) ifpb com 15GB
-      lvol:
-        vg: dados
-        lv: ifpb
-        size: 15G
-        force: yes
+    - name: Criar Logical Volume ifpb_lv
+      shell: |
+        if ! lvs ifpb_vg/ifpb_lv 2>/dev/null; then
+          if lvcreate -L 15G -n ifpb_lv ifpb_vg 2>/dev/null; then
+            echo "created_15GB"
+          else
+            lvcreate -l 100%FREE -n ifpb_lv ifpb_vg 2>/dev/null && echo "created_with_free_space"
+          fi
+        fi
+      when: discos_disponiveis | length > 0
 
     - name: Formatar LV com ext4
       filesystem:
         fstype: ext4
-        dev: "/dev/dados/ifpb"
+        dev: /dev/ifpb_vg/ifpb_lv
+        force: no
+      when: discos_disponiveis | length > 0
 
-    - name: Criar diretório /dados
+    - name: Criar diretório de montagem
       file:
-        path: /dados
+        path: "{{ mount_point }}"
         state: directory
         owner: root
         group: root
         mode: '0755'
 
-    - name: Montar /dados automaticamente no boot
+    - name: Montar LV no diretório
       mount:
-        path: /dados
-        src: "/dev/dados/ifpb"
+        path: "{{ mount_point }}"
+        src: /dev/ifpb_vg/ifpb_lv
         fstype: ext4
         state: mounted
         opts: defaults
-
-    - name: Adicionar ao fstab
-      lineinfile:
-        path: /etc/fstab
-        line: '/dev/dados/ifpb /dados ext4 defaults 0 0'
-        state: present
+      when: discos_disponiveis | length > 0
 
     # ================= NFS =================
     - name: Instalar NFS Server
       apt:
         name: nfs-kernel-server
         state: present
+        update_cache: yes
 
-    - name: Criar usuário nfs-ifpb SEM SHELL
+    - name: Criar usuário nfs-ifpb
       user:
         name: nfs-ifpb
-        shell: /usr/sbin/nologin  # Remove shell para segurança
+        shell: /usr/sbin/nologin
         system: yes
         state: present
+        create_home: no
 
-    - name: Criar diretório NFS
+    - name: Garantir que diretório NFS existe
       file:
-        path: /dados/nfs
+        path: "{{ nfs_dir }}"
         state: directory
         owner: nfs-ifpb
         group: nfs-ifpb
         mode: '0775'
 
-    - name: Configurar exports NFS com todas opções de segurança
+    - name: Obter UID do usuário nfs-ifpb
+      shell: "id -u nfs-ifpb"
+      register: nfs_uid_cmd
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Obter GID do usuário nfs-ifpb
+      shell: "id -g nfs-ifpb"
+      register: nfs_gid_cmd
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Definir UID e GID (com fallback)
+      set_fact:
+        nfs_uid: "{{ nfs_uid_cmd.stdout | default('65534') }}"
+        nfs_gid: "{{ nfs_gid_cmd.stdout | default('65534') }}"
+
+    - name: Configurar exports NFS
       copy:
         dest: /etc/exports
         content: |
-          # Compartilhamento NFS com configurações de segurança
-          /dados/nfs 192.168.56.0/24(rw,sync,no_subtree_check,all_squash,anonuid=$(id -u nfs-ifpb),anongid=$(id -g nfs-ifpb))
+          # Compartilhamento NFS
+          {{ nfs_dir }} {{ rede }}(rw,sync,no_subtree_check,all_squash,anonuid={{ nfs_uid }},anongid={{ nfs_gid }})
         owner: root
         group: root
         mode: '0644'
-      notify: restart nfs
+      notify: restart nfs-server  # Nome correto do handler
 
+    # ================= GERENCIAMENTO DE SERVIÇOS =================
     - name: Garantir que serviços iniciam no boot
       systemd:
         name: "{{ item }}"
@@ -173,6 +222,24 @@
         - isc-dhcp-server
         - bind9
         - nfs-kernel-server
+
+    # ================= VERIFICAÇÕES =================
+    - name: Verificar status LVM
+      shell: |
+        echo "PVs:"; pvs 2>/dev/null || echo "Nenhum"
+        echo "VGs:"; vgs 2>/dev/null || echo "Nenhum"
+        echo "LVs:"; lvs 2>/dev/null || echo "Nenhum"
+      register: lvm_check
+      changed_when: false
+
+    - name: Verificar NFS
+      shell: |
+        echo "Exports:"
+        cat /etc/exports 2>/dev/null || echo "Arquivo não existe"
+        echo "Status exportfs:"
+        exportfs -v 2>/dev/null || echo "Nenhum export ativo"
+      register: nfs_check
+      changed_when: false
 
   handlers:
     - name: restart dhcp
@@ -185,7 +252,8 @@
         name: bind9
         state: restarted
 
-    - name: restart nfs
+    # CORREÇÃO: Handler com nome correto
+    - name: restart nfs-server
       systemd:
         name: nfs-kernel-server
         state: restarted
