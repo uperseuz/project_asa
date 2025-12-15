@@ -1,32 +1,38 @@
 ---
-- import_playbook: common.yml
-
-- name: Configuração do servidor de aplicação
+# Playbook para servidor de aplicação (app)
+- name: Configurar servidor app
   hosts: app
   become: yes
 
   vars:
-    nfs_server: "arq.caua.joao.devops"
-    nfs_share: "/dados/nfs"
+    nome1: caua
+    nome2: joao
+    matricula1: 20241380021
+    matricula2: 20241380005
+    ip_arq: "192.168.56.121"
+    ip_app: "192.168.56.115"
+    dominio: "caua.joao.devops"
 
   tasks:
-    # Apache Web Server
-    - name: Instalar Apache2
+    # Apache
+    - name: Instalar Apache
       apt:
         name: apache2
         state: present
 
-    - name: Ativar Apache
-      service:
+    - name: Criar página web
+      template:
+        src: "templates/index.html.j2"
+        dest: "/var/www/html/index.html"
+        owner: www-data
+        group: www-data
+        mode: '0644'
+
+    - name: Iniciar Apache
+      systemd:
         name: apache2
         state: started
         enabled: yes
-
-    # Página web do projeto
-    - name: Copiar página index.html
-      template:
-        src: index.html.j2
-        dest: /var/www/html/index.html
 
     # Autofs para NFS
     - name: Instalar autofs
@@ -34,26 +40,27 @@
         name: autofs
         state: present
 
-    - name: Configurar auto.master
-      template:
-        src: auto.master.j2
-        dest: /etc/auto.master
-      notify: restart autofs
-
-    - name: Configurar mapa NFS
+    - name: Configurar montagem NFS
       copy:
-        content: "* -fstype=nfs4 {{ nfs_server }}:{{ nfs_share }}"
-        dest: /etc/auto.nfs
-      notify: restart autofs
+        dest: "/etc/auto.nfs"
+        content: "nfs -fstype=nfs4,rw {{ ip_arq }}:/dados/nfs"
+        owner: root
+        group: root
+        mode: '0644'
 
-    - name: Criar ponto de montagem
+    - name: Configurar auto.master
+      lineinfile:
+        path: "/etc/auto.master"
+        line: "/var/nfs /etc/auto.nfs"
+        state: present
+
+    - name: Criar diretório de montagem
       file:
-        path: /var/nfs
+        path: "/var/nfs"
         state: directory
 
-  handlers:
-    - name: restart autofs
-      service:
+    - name: Reiniciar autofs
+      systemd:
         name: autofs
         state: restarted
         enabled: yes
