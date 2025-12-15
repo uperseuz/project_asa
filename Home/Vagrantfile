@@ -40,23 +40,10 @@ Vagrant.configure("2") do |config|
       vb.memory = 512
 
       # Criar e anexar 3 discos de 10GB
-      (1..3).each do |i|
-        disk = File.expand_path("disk-arq-#{i}.vdi", __dir__)
-
-        unless File.exist?(disk)
-          vb.customize ["createhd",
-                        "--filename", disk,
-                        "--size", 10240]
-        end
-
-        vb.customize ["storageattach", :id,
-                      "--storagectl", "SATA Controller",
-                      "--port", i,
-                      "--device", 0,
-                      "--type", "hdd",
-                      "--medium", disk]
-      end
+          (0..2).each do |x|
+      arq.vm.disk :disk, size: "10GB", name: "disk-#{x}"
     end
+
 
     arq.vm.provision "ansible" do |ansible|
       ansible.playbook = "playbooks/arq.yml"
