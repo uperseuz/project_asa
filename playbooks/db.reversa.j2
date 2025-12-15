@@ -1,0 +1,20 @@
+; Reverse zone for 192.168.56.0/24
+$TTL    86400
+@       IN      SOA     arq.{{ dominio }}. admin.{{ dominio }}. (
+                    1         ; Serial
+                    3600      ; Refresh
+                    1800      ; Retry
+                    604800    ; Expire
+                    86400 )   ; Minimum TTL
+
+@       IN      NS      arq.{{ dominio }}.
+
+; PTR records
+{% set ip_parts = ip_arq.split('.') %}
+{{ ip_parts[3] }}      IN      PTR     arq.{{ dominio }}.
+
+{% set ip_parts = ip_db.split('.') %}
+{{ ip_parts[3] }}      IN      PTR     db.{{ dominio }}.
+
+{% set ip_parts = ip_app.split('.') %}
+{{ ip_parts[3] }}      IN      PTR     app.{{ dominio }}.
