@@ -10,7 +10,7 @@
     ip_app: 192.168.56.125
     gateway: 192.168.56.1
     rede: 192.168.56.0/24
-    gateway: 192.168.56.1
+    interface_dhcp: "eth1"
     usuarios:
       - caua
       - joao
