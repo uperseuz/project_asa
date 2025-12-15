@@ -1,0 +1,49 @@
+---
+- import_playbook: common.yml
+
+- name: Configuração do host cliente
+  hosts: cli
+  become: yes
+
+  vars:
+    nfs_server: "arq.caua.joao.devops"
+    nfs_share: "/dados/nfs"
+
+  tasks:
+    # Pacotes exigidos
+    - name: Instalar Firefox e X11
+      apt:
+        name:
+          - firefox-esr
+          - xauth
+        state: present
+
+    # Autofs
+    - name: Instalar autofs
+      apt:
+        name: autofs
+        state: present
+
+    - name: Configurar auto.master
+      template:
+        src: auto.master.j2
+        dest: /etc/auto.master
+      notify: restart autofs
+
+    - name: Configurar mapa NFS
+      copy:
+        content: "* -fstype=nfs4 {{ nfs_server }}:{{ nfs_share }}"
+        dest: /etc/auto.nfs
+      notify: restart autofs
+
+    - name: Criar ponto de montagem
+      file:
+        path: /var/nfs
+        state: directory
+
+  handlers:
+    - name: restart autofs
+      service:
+        name: autofs
+        state: restarted
+        enabled: yes
