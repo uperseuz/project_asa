@@ -1,0 +1,20 @@
+options {
+    directory "/var/cache/bind";
+    
+    # Aceitar requisições da rede interna (conforme projeto)
+    allow-query { localhost; 192.168.56.0/24; };
+    
+    # Encaminhamento para DNS recursivos (conforme projeto)
+    forwarders {
+        1.1.1.1;
+        8.8.8.8;
+    };
+    
+    forward only;
+    dnssec-validation auto;
+    
+    listen-on port 53 { localhost; {{ ip_arq }}; };
+    listen-on-v6 { none; };
+    
+    recursion yes;
+};
