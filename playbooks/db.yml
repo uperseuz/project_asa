@@ -1,0 +1,60 @@
+---
+# Importa a configuração comum
+- import_playbook: common.yml
+
+# Configuração específica do servidor DB
+- name: Configuração do servidor de banco de dados
+  hosts: db
+  become: yes
+
+  vars:
+    # Servidor NFS (arq)
+    nfs_server: "arq.caua.joao.devops"
+    nfs_share: "/dados/nfs"
+
+  tasks:
+    # Instalação do MariaDB
+    - name: Instalar MariaDB Server
+      apt:
+        name: mariadb-server
+        state: present
+
+    # Inicialização e habilitação do serviço
+    - name: Iniciar MariaDB
+      service:
+        name: mariadb
+        state: started
+        enabled: yes
+
+    # Autofs para montagem automática do NFS
+    - name: Instalar autofs
+      apt:
+        name: autofs
+        state: present
+
+    # Configuração do arquivo auto.master
+    - name: Configurar auto.master
+      template:
+        src: auto.master.j2
+        dest: /etc/auto.master
+      notify: restart autofs
+
+    # Mapa do NFS
+    - name: Configurar mapa NFS
+      copy:
+        content: "* -fstype=nfs4 {{ nfs_server }}:{{ nfs_share }}"
+        dest: /etc/auto.nfs
+      notify: restart autofs
+
+    # Diretório de montagem
+    - name: Criar ponto de montagem NFS
+      file:
+        path: /var/nfs
+        state: directory
+
+  handlers:
+    - name: restart autofs
+      service:
+        name: autofs
+        state: restarted
+        enabled: yes
