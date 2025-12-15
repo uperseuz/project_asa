@@ -17,6 +17,14 @@ Vagrant.configure("2") do |config|
     config.vbguest.auto_update = false
   end
 
+  # Configurações do provedor VirtualBox:
+  config.vm.provider :virtualbox do |v|
+    v.memory = 512           # Memória RAM padrão as vms
+    v.linked_clone = true    # Ativa linked clone
+    v.check_guest_additions = false  # Desabilita verificação de guest additions
+  end
+
+
 
   # Trigger para desabilitar DHCP do VirtualBox (Host-Only)
   config.trigger.after :up do |trigger|
@@ -26,6 +34,13 @@ Vagrant.configure("2") do |config|
         VBoxManage dhcpserver remove --netname HostInterfaceNetworking-vboxnet0 || true
       SHELL
     }
+  end
+
+  config.vm.provision "ansible" do |ansible|
+    ansible.compatibility_mode = "2.0"
+    ansible.playbook = "playbooks/geral.yml"
+    ansible.groups = {
+      "all" => ["arq", "db", "app", "cli"] 
   end
 
   # ================= SERVIDOR DE ARQUIVOS =================
