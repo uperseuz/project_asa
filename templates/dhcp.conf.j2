@@ -1,0 +1,35 @@
+# Servidor DHCP autoritativo
+authoritative;
+
+# Lease time conforme o enunciado
+default-lease-time 180;
+max-lease-time 3600;
+
+# Domínio do projeto
+option domain-name "{{ dominio }}";
+
+# Servidor DNS (arq)
+option domain-name-servers {{ ip_arq }};
+
+# Máscara e gateway padrão
+option subnet-mask 255.255.255.0;
+option routers {{ gateway }};
+
+# Escopo da rede
+subnet 192.168.56.0 netmask 255.255.255.0 {
+
+    # Faixa dinâmica exigida
+    range {{ dhcp_range_start }} {{ dhcp_range_end }};
+
+    # Reserva estática para o servidor DB
+    host db {
+        hardware ethernet 08:00:27:AA:AA:AA;
+        fixed-address {{ ip_db }};
+    }
+
+    # Reserva estática para o servidor APP
+    host app {
+        hardware ethernet 08:00:27:BB:BB:BB;
+        fixed-address {{ ip_app }};
+    }
+}
