@@ -50,8 +50,8 @@
 
     - name: Criar usuários do grupo
       user:
-      name: "{{ item }}" # Variável que será substituída pelos itens do loop
-        groups: ifpb       # Adiciona o usuário ao grupo ifpb
+        name: "{{ item }}" # Variável que será substituída pelos itens do loop
+        groups: ifpb
         append: yes        # Adiciona ao grupo sem remover outros grupos
         shell: /bin/bash   # Shell padrão do usuário
       loop:
