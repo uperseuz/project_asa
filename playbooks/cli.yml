@@ -1,17 +1,19 @@
 ---
-# Playbook simplificado para cliente
+# Playbook simplificado para cliente - CORRIGIDO
 - name: Configuração básica do host cliente
   hosts: cli
   become: yes
 
   tasks:
-    # 1. Pacotes obrigatórios
-    - name: Instalar firefox-esr e xauth
+    # 1. Instalar pacotes obrigatórios (INCLUINDO autofs)
+    - name: Instalar pacotes necessários
       apt:
         name:
           - firefox-esr
           - xauth
+          - autofs  # ADICIONADO AQUI - INSTALAR PRIMEIRO!
         state: present
+        update_cache: yes
 
     # 2. Configurar SSH para X11
     - name: Habilitar X11 Forwarding
@@ -22,7 +24,20 @@
         state: present
       notify: restart ssh
 
-    # 3. Configurar autofs para NFS
+    # 3. Garantir que auto.master existe
+    - name: Criar auto.master se não existir
+      copy:
+        dest: /etc/auto.master
+        content: |
+          # /etc/auto.master
+          # Mount point    Map file
+          +auto.master
+        owner: root
+        group: root
+        mode: '0644'
+      when: not lookup('file', '/etc/auto.master', errors='ignore')
+
+    # 4. Configurar autofs para NFS
     - name: Configurar autofs para NFS
       copy:
         dest: /etc/auto.nfs-cli
@@ -31,14 +46,14 @@
         owner: root
         group: root
         mode: '0644'
-      notify: restart autofs
 
-    - name: Adicionar ao auto.master
+    - name: Adicionar entrada ao auto.master
       lineinfile:
         path: /etc/auto.master
         line: '/var/nfs /etc/auto.nfs-cli'
         state: present
-      notify: restart autofs
+        create: yes  # CRÍTICO: cria arquivo se não existir
+        backup: yes
 
     - name: Criar diretório de montagem
       file:
@@ -46,15 +61,31 @@
         state: directory
         owner: root
         group: root
+        mode: '0755'
 
-    # 4. Garantir serviços ativos
-    - name: Reiniciar serviços
+    # 5. Garantir serviços ativos
+    - name: Habilitar e iniciar serviços
       systemd:
         name: "{{ item }}"
-        state: restarted
+        state: started
+        enabled: yes
       loop:
         - ssh
         - autofs
+
+    # 6. Verificar configuração
+    - name: Verificar configuração autofs
+      shell: |
+        echo "=== auto.master ==="
+        cat /etc/auto.master 2>/dev/null || echo "Arquivo não existe"
+        echo "=== auto.nfs-cli ==="
+        cat /etc/auto.nfs-cli 2>/dev/null || echo "Arquivo não existe"
+      register: autofs_check
+      changed_when: false
+
+    - name: Mostrar status autofs
+      debug:
+        msg: "{{ autofs_check.stdout_lines }}"
 
   handlers:
     - name: restart ssh
