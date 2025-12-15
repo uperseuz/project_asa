@@ -1,0 +1,16 @@
+; Zone file for {{ dominio }}
+$TTL    86400
+@       IN      SOA     arq.{{ dominio }}. admin.{{ dominio }}. (
+                    1         ; Serial
+                    3600      ; Refresh
+                    1800      ; Retry
+                    604800    ; Expire
+                    86400 )   ; Minimum TTL
+
+; Name servers
+@       IN      NS      arq.{{ dominio }}.
+
+; A records
+arq     IN      A       {{ ip_arq }}
+db      IN      A       {{ ip_db }}
+app     IN      A       {{ ip_app }}
