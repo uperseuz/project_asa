@@ -16,7 +16,7 @@
         state: started
         enabled: yes
 
-    # 2. Autofs para NFS (versão segura)
+    # 2. Autofs para NFS
     - name: Instalar autofs
       apt:
         name: autofs
