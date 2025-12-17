@@ -67,7 +67,7 @@
     - name: Criar zona direta
       template:
         src: db.dominio.j2
-        dest: "/etc/bind/db.{{ dominio.split('.')[0] }}"
+        dest: "/etc/bind/db.{{ dominio}}"
         mode: '0644'
       notify: restart bind9
 
