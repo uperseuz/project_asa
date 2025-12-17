@@ -53,6 +53,7 @@ Vagrant.configure("2") do |config|
 
     arq.vm.provision "ansible" do |ansible|
       ansible.playbook = "playbooks/arq.yml"
+      ansible.compatibility_mode = "2.0"
       ansible.become = true
       ansible.verbose = "v"
     end
@@ -68,6 +69,7 @@ Vagrant.configure("2") do |config|
 
     db.vm.provision "ansible" do |ansible|
       ansible.playbook = "playbooks/db.yml"
+      ansible.compatibility_mode = "2.0"      
       ansible.become = true
       ansible.verbose = "v"
     end
@@ -82,6 +84,7 @@ Vagrant.configure("2") do |config|
       mac: "0800272B2100"
 
     app.vm.provision "ansible" do |ansible|
+      ansible.compatibility_mode = "2.0"
       ansible.playbook = "playbooks/app.yml"
       ansible.become = true
       ansible.verbose = "v"
@@ -99,6 +102,7 @@ Vagrant.configure("2") do |config|
     end
 
     cli.vm.provision "ansible" do |ansible|
+      ansible.compatibility_mode = "2.0"
       ansible.playbook = "playbooks/cli.yml"
       ansible.become = true
       ansible.verbose = "v"
