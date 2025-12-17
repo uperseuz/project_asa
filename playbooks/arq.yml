@@ -71,7 +71,7 @@
         mode: '0644'
       notify: restart bind9
 
-    - name: Criar zona reversa (OBRIGATÓRIO no projeto)
+    - name: Criar zona reversa 
       template:
         src: db.reversa.j2
         dest: /etc/bind/db.56.168.192
