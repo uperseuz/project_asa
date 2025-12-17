@@ -223,23 +223,6 @@
         - bind9
         - nfs-kernel-server
 
-    # ================= VERIFICAÇÕES =================
-    - name: Verificar status LVM
-      shell: |
-        echo "PVs:"; pvs 2>/dev/null || echo "Nenhum"
-        echo "VGs:"; vgs 2>/dev/null || echo "Nenhum"
-        echo "LVs:"; lvs 2>/dev/null || echo "Nenhum"
-      register: lvm_check
-      changed_when: false
-
-    - name: Verificar NFS
-      shell: |
-        echo "Exports:"
-        cat /etc/exports 2>/dev/null || echo "Arquivo não existe"
-        echo "Status exportfs:"
-        exportfs -v 2>/dev/null || echo "Nenhum export ativo"
-      register: nfs_check
-      changed_when: false
 
   handlers:
     - name: restart dhcp
